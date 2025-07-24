@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebbyAi</title>
+    <title>AI Browser Control</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -59,7 +59,7 @@
             </div>
 
              <!-- Status Message -->
-            <div id="status-message" class="mt-4 text-center text-gray-600 font-medium h-6"></div>
+            <div id="status-message" class="mt-4 text-center text-red-500 font-medium h-6"></div>
 
             <!-- Controls -->
             <div class="mt-2">
@@ -86,8 +86,9 @@
     </div>
 
     <script>
+        // NOTE: The BROWSERBASE_API_KEY is no longer needed here.
+        // It is securely stored as an environment variable in Vercel.
         const BROWSERBASE_PROJECT_ID = '00df4b6c-bbb6-4f05-bcd5-f54a40ba489f';
-        const BROWSERBASE_API_KEY = 'bb_live_-igDg9u5tgLIM-H5p8jQcwDB3mQ';
         const PROXY_ENDPOINT = '/api/proxy';
 
         const promptInput = document.getElementById('prompt-input');
@@ -108,7 +109,6 @@
             try {
                 const headers = {
                     'Content-Type': 'application/json',
-                    'x-bb-api-key': BROWSERBASE_API_KEY,
                     'x-target-path': path
                 };
                 const options = { method, headers };
@@ -118,10 +118,12 @@
                 const response = await fetch(PROXY_ENDPOINT, options);
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`API error: ${response.status} - ${errorText}`);
+                    // FIX: Throw a more descriptive error to be caught below.
+                    throw new Error(`API returned ${response.status}: ${errorText}`);
                 }
                 return response.status === 204 ? null : response.json();
             } catch (error) {
+                // FIX: Display the detailed error message in the UI.
                 console.error(`Error with ${method} ${path}:`, error);
                 statusMessage.textContent = `Error: ${error.message}`;
                 return null;
@@ -133,7 +135,8 @@
         }
 
         async function executeInstructions(sessionId, prompt) {
-            return await apiRequest('POST', `/sessions/${sessionId}/instructions`, { prompt, projectId: BROWSERBASE_PROJECT_ID });
+            // Note: projectId is not needed for this endpoint according to docs.
+            return await apiRequest('POST', `/sessions/${sessionId}/instructions`, { prompt });
         }
 
         async function getSessionStatus(sessionId) {
@@ -156,6 +159,8 @@
                 const session = await getSessionStatus(id);
                 if (session) {
                     const state = session.state.toLowerCase();
+                    statusMessage.classList.remove('text-red-500');
+                    statusMessage.classList.add('text-gray-600');
                     statusMessage.textContent = `AI status: ${state}...`;
                     if (state === 'completed' || state === 'error') {
                         clearInterval(pollingInterval);
@@ -164,7 +169,6 @@
                     }
                 } else {
                     clearInterval(pollingInterval);
-                    statusMessage.textContent = 'Could not retrieve AI status.';
                     setControlsDisabled(false);
                 }
             }, 2500);
@@ -204,7 +208,10 @@
                 sessionId = null; 
             }
             
-            await startNewSession();
+            statusMessage.textContent = 'Waiting for session to terminate...';
+            setTimeout(() => {
+                startNewSession();
+            }, 2000); 
         });
 
         // --- Helper Functions ---
@@ -229,19 +236,20 @@
             loader.style.display = 'block';
             browserIframe.src = 'about:blank';
             statusMessage.textContent = 'Creating a new session...';
+            statusMessage.classList.remove('text-red-500');
+            statusMessage.classList.add('text-gray-600');
             setControlsDisabled(true);
             endSessionButton.disabled = true;
 
             const session = await createSession();
-            // FIX: Add a check to ensure the session object and its ws_url are valid before using them.
             if (session && session.ws_url) {
                 sessionId = session.id;
                 browserIframe.src = session.ws_url;
                 browserIframe.style.pointerEvents = 'none';
                 statusMessage.textContent = 'New session started. AI is ready for instructions.';
             } else {
-                statusMessage.textContent = 'Failed to start a new session. API did not return a valid session URL.';
-                console.error("Invalid session object received:", session);
+                // The error message is now set by the apiRequest function's catch block.
+                console.error("Failed to start a new session. See error message above.");
             }
             loader.style.display = 'none';
             setControlsDisabled(false);
@@ -249,7 +257,9 @@
         }
 
         // --- Initial Load ---
-        window.addEventListener('load', startNewSession);
+        window.addEventListener('load', () => {
+            setTimeout(startNewSession, 500);
+        });
 
     </script>
 </body>

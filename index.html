@@ -118,12 +118,10 @@
                 const response = await fetch(PROXY_ENDPOINT, options);
                 if (!response.ok) {
                     const errorText = await response.text();
-                    // FIX: Throw a more descriptive error to be caught below.
                     throw new Error(`API returned ${response.status}: ${errorText}`);
                 }
                 return response.status === 204 ? null : response.json();
             } catch (error) {
-                // FIX: Display the detailed error message in the UI.
                 console.error(`Error with ${method} ${path}:`, error);
                 statusMessage.textContent = `Error: ${error.message}`;
                 return null;
@@ -135,7 +133,6 @@
         }
 
         async function executeInstructions(sessionId, prompt) {
-            // Note: projectId is not needed for this endpoint according to docs.
             return await apiRequest('POST', `/sessions/${sessionId}/instructions`, { prompt });
         }
 
@@ -248,7 +245,6 @@
                 browserIframe.style.pointerEvents = 'none';
                 statusMessage.textContent = 'New session started. AI is ready for instructions.';
             } else {
-                // The error message is now set by the apiRequest function's catch block.
                 console.error("Failed to start a new session. See error message above.");
             }
             loader.style.display = 'none';

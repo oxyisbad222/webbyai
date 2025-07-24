@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Browser Control</title>
+    <title>WebbyAi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -191,23 +191,19 @@
             toggleControl();
         });
         
-        // FIX: Reworked session handling to prevent race conditions and rate limit errors.
         endSessionButton.addEventListener('click', async () => {
-            // Disable all buttons immediately to prevent multiple clicks.
             setControlsDisabled(true);
             endSessionButton.disabled = true;
 
             if (isTakingControl) toggleControl();
             if (pollingInterval) clearInterval(pollingInterval);
             
-            // First, properly delete the old session if one exists.
             if (sessionId) {
                 statusMessage.textContent = 'Ending previous session...';
                 await deleteSession(sessionId);
-                sessionId = null; // Important: Clear the old session ID.
+                sessionId = null; 
             }
             
-            // Only after the old session is gone, start a new one.
             await startNewSession();
         });
 
@@ -237,13 +233,15 @@
             endSessionButton.disabled = true;
 
             const session = await createSession();
-            if (session) {
+            // FIX: Add a check to ensure the session object and its ws_url are valid before using them.
+            if (session && session.ws_url) {
                 sessionId = session.id;
                 browserIframe.src = session.ws_url;
                 browserIframe.style.pointerEvents = 'none';
                 statusMessage.textContent = 'New session started. AI is ready for instructions.';
             } else {
-                statusMessage.textContent = 'Failed to start a new session. Please check your API keys or try again later.';
+                statusMessage.textContent = 'Failed to start a new session. API did not return a valid session URL.';
+                console.error("Invalid session object received:", session);
             }
             loader.style.display = 'none';
             setControlsDisabled(false);

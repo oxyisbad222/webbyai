@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webby Ai</title>
+    <title>AI Browser Control</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -108,7 +108,6 @@
             try {
                 const headers = {
                     'Content-Type': 'application/json',
-                    'x-bb-project-id': BROWSERBASE_PROJECT_ID,
                     'x-bb-api-key': BROWSERBASE_API_KEY,
                     'x-target-path': path
                 };
@@ -130,12 +129,10 @@
         }
 
         async function createSession() {
-            // FIX: Added projectId to the request body as required by the API.
             return await apiRequest('POST', '/sessions', { projectId: BROWSERBASE_PROJECT_ID });
         }
 
         async function executeInstructions(sessionId, prompt) {
-            // FIX: Added projectId to the request body as required by the API.
             return await apiRequest('POST', `/sessions/${sessionId}/instructions`, { prompt, projectId: BROWSERBASE_PROJECT_ID });
         }
 
@@ -145,7 +142,6 @@
 
         async function deleteSession(sessionId) {
             if (!sessionId) return;
-            statusMessage.textContent = 'Ending session...';
             await apiRequest('DELETE', `/sessions/${sessionId}`);
             console.log(`Session ${sessionId} deleted.`);
         }
@@ -156,7 +152,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
 
             pollingInterval = setInterval(async () => {
-                if (isTakingControl) return; // Don't poll if user has control
+                if (isTakingControl) return; 
                 const session = await getSessionStatus(id);
                 if (session) {
                     const state = session.state.toLowerCase();
@@ -171,7 +167,7 @@
                     statusMessage.textContent = 'Could not retrieve AI status.';
                     setControlsDisabled(false);
                 }
-            }, 2500); // Poll every 2.5 seconds
+            }, 2500);
         }
 
         // --- Event Listeners ---
@@ -195,12 +191,23 @@
             toggleControl();
         });
         
+        // FIX: Reworked session handling to prevent race conditions and rate limit errors.
         endSessionButton.addEventListener('click', async () => {
+            // Disable all buttons immediately to prevent multiple clicks.
+            setControlsDisabled(true);
+            endSessionButton.disabled = true;
+
             if (isTakingControl) toggleControl();
             if (pollingInterval) clearInterval(pollingInterval);
             
-            await deleteSession(sessionId);
-            sessionId = null;
+            // First, properly delete the old session if one exists.
+            if (sessionId) {
+                statusMessage.textContent = 'Ending previous session...';
+                await deleteSession(sessionId);
+                sessionId = null; // Important: Clear the old session ID.
+            }
+            
+            // Only after the old session is gone, start a new one.
             await startNewSession();
         });
 

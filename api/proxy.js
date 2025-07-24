@@ -5,16 +5,16 @@
 
 export default async function handler(req, res) {
     // Extract the target path from a custom header sent by the frontend.
-    // e.g., '/sessions' or '/sessions/some-id/instructions'
     const targetPath = req.headers['x-target-path'];
+    if (!targetPath) {
+        return res.status(400).json({ message: 'x-target-path header is required.' });
+    }
     const browserbaseApiUrl = `https://api.browserbase.com/v1${targetPath}`;
 
     // Set CORS headers to allow requests from your Vercel deployment.
-    // IMPORTANT: In production, you should replace '*' with your specific Vercel domain
-    // for better security, e.g., 'https://your-project-name.vercel.app'.
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bb-project-id, x-bb-api-key, x-target-path');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bb-api-key, x-target-path');
 
     // Respond to preflight CORS requests
     if (req.method === 'OPTIONS') {
@@ -27,22 +27,23 @@ export default async function handler(req, res) {
             method: req.method,
             headers: {
                 'Content-Type': 'application/json',
-                'x-bb-project-id': req.headers['x-bb-project-id'],
+                // FIX: Only the API key is needed in the header for most requests.
+                // The project ID is passed in the body by the client when required.
                 'x-bb-api-key': req.headers['x-bb-api-key'],
             },
-            // Pass the body along if it exists.
             body: req.body ? JSON.stringify(req.body) : null,
         });
 
-        // Check if the request to Browserbase was successful.
         if (!response.ok) {
-            // If not, pass the error response back to the frontend.
             const errorData = await response.text();
             console.error("Error from Browserbase API:", errorData);
             return res.status(response.status).send(errorData);
         }
+        
+        if (response.status === 204) { // No Content
+            return res.status(204).end();
+        }
 
-        // Send the successful response from Browserbase back to the frontend.
         const data = await response.json();
         res.status(200).json(data);
 

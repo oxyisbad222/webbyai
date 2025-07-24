@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     // Set CORS headers to allow requests from your Vercel deployment.
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bb-api-key, x-target-path');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-target-path');
 
     // Respond to preflight CORS requests
     if (req.method === 'OPTIONS') {
@@ -22,14 +22,26 @@ export default async function handler(req, res) {
     }
 
     try {
+        // The API key is securely read from Vercel's environment variables
+        // on the server-side, instead of being passed from the client.
+        const apiKey = process.env.BROWSERBASE_API_KEY;
+
+        // --- DEBUGGING STEP ---
+        // This will help us confirm if the Vercel function is accessing the environment variable.
+        if (apiKey) {
+            console.log("Successfully accessed BROWSERBASE_API_KEY. Key starts with:", apiKey.substring(0, 5));
+        } else {
+            console.error("CRITICAL: BROWSERBASE_API_KEY environment variable is NOT SET or is empty.");
+            return res.status(500).json({ message: 'Server configuration error: BROWSERBASE_API_KEY is not set.' });
+        }
+        // --- END DEBUGGING STEP ---
+
         // Forward the request from the frontend to the Browserbase API.
         const response = await fetch(browserbaseApiUrl, {
             method: req.method,
             headers: {
                 'Content-Type': 'application/json',
-                // FIX: Only the API key is needed in the header for most requests.
-                // The project ID is passed in the body by the client when required.
-                'x-bb-api-key': req.headers['x-bb-api-key'],
+                'x-bb-api-key': apiKey,
             },
             body: req.body ? JSON.stringify(req.body) : null,
         });
